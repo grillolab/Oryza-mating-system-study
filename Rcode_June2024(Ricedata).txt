@@ -1,0 +1,1882 @@
+# Rice data analysis, graphics, ANOVA and MANOVA. Analysis per trait and combined traits (MANOVA)
+
+#Anther length data analysis
+antherlen_2<-read.csv("C:/Users/afgut/vm_files/RiceData/AntherLen(R).csv")
+antherlen_2
+levels(antherlen_2$Variety)
+library(dplyr)
+
+# Convert needed variables to factor
+antherlen_2$Variety<-as.factor(antherlen_2$Variety)
+antherlen_2$Species<-as.factor(antherlen_2$Species)
+group_by(antherlen_2, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(AntherLen.mm., na.rm = TRUE), median = median(AntherLen.mm.,na.rm =TRUE),
+    sd = sd(AntherLen.mm., na.rm = TRUE)
+  )
+install.packages("ggpubr")
+library(ggpubr)
+ggboxplot(antherlen_2, x = "Variety", y = "AntherLen.mm.", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Anther Length (mm)", xlab = "Accession")
+
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# ANOVA analysis of anther length
+antherlen.aov <- aov(AntherLen.mm. ~ Variety , data = antherlen_2)
+antherlen_S.aov <- aov(AntherLen.mm. ~ Species , data = antherlen_2)
+
+# Summary of the analysis and Tukey HSD
+summary(antherlen.aov)
+summary(antherlen_S.aov)
+
+TukeyHSD(antherlen.aov)
+
+antherlen_B.aov <- aov(AntherLen.mm. ~ Variety + Species , data = antherlen_2)
+# Summary of the analysis
+summary(antherlen_B.aov)
+
+#adding tukey results to the graphics
+install.packages("emmeans")
+library(emmeans)
+install.packages("multcompView")
+library(multcompView)
+library(ggplot2)
+antherlen_contr <- emmeans::emmeans(object = antherlen.aov,
+                                    pairwise ~ "Variety",
+                                    adjust = "dunn")
+antherlen_means <- multcomp::cld(object = antherlen_contr$emmeans,
+                                 Letters = letters)
+
+# Convert the 'Variety' column to a factor with the desired order
+antherlen_means$Variety <- factor(antherlen_means$Variety, levels = desired_order)
+antherlen_means<-antherlen_means[match(desired_order,antherlen_means$Variety),]
+antherlen_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+antherlen_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+antherlen_means$Accession <- factor(antherlen_means$Accession, levels = desired_order3)
+antherlen_means<-antherlen_means[match(desired_order3,antherlen_means$Accession),]
+antherlen_means
+
+# Plot the data
+jpeg("/Users/afgut/vm_files/RiceData/AntherLen.jpg")
+tiff("/Users/afgut/vm_files/RiceData/New Data/AntherLen.tiff", units="in", width=8, height=6, res=600, compression = 'lzw')
+ggplot(data = antherlen_means,aes(x = Accession, y = emmean, color = Accession)) + 
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.2), 
+            size = 11 / .pt, family = "sans") +
+  scale_y_continuous(limits = c(1.5, NA), breaks = seq(1, 10, by = 1), expand = c(0, 0.1)) +  # Custom Y-axis settings
+  ylab("Anther length (mm)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test", family ="sans") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") +
+  theme_classic(base_size = 14) +  # Use a classic theme for a clean look
+theme(
+  axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+  axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+  axis.text.x = element_text(size = 12, family = "sans"),
+  axis.text.y = element_text(size = 14, family = "sans"),
+  legend.position = "none", strip.text = element_text(size = 14, face = "italic", family = "sans")
+)
+
+dev.off()
+
+install.packages("multcomp")
+library(multcomp)
+pairwise.t.test(antherlen_2$AntherLen.mm., antherlen_2$Variety,
+                p.adjust.method = "BH", var.equal = FALSE)
+
+library(car) # Levene test
+leveneTest(AntherLen.mm. ~ Variety, data = antherlen_2)
+# Extract the residuals
+Antheraov_residuals <- residuals(object = antherlen.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Antheraov_residuals )
+
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(AntherLen.mm. ~ Variety, data = antherlen_2)
+
+kruskal.test(AntherLen.mm. ~ Species, data = antherlen_2)
+# Post Hoc analysis Kruskal
+install.packages("FSA")
+library(FSA)
+dunnTest(AntherLen.mm. ~ Variety, data = antherlen_2)
+
+#Pairwise t-tests with no assumption of equal variances
+pairwise.t.test(antherlen_2$AntherLen.mm., antherlen_2$Variety,
+                p.adjust.method = "BH",pool.sd=FALSE)
+
+#Corrected graphics for paper after revision. The group variable added to the csv file is based on the emmeans analysis previously performed
+
+antherlen_3<-read.csv("C:/Users/afgut/vm_files/RiceData/AntherLen(R)_2.csv")
+antherlen_3
+levels(antherlen_3$Accession)
+library(dplyr)
+antherlen_3$Accession<-as.factor(antherlen_3$Accession)
+antherlen_3$Species<-as.factor(antherlen_3$Species)
+antherlen_3$Group<-as.factor(antherlen_3$Group)
+
+# Summarize data
+summary_df <- antherlen_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_anther_len = quantile(AntherLen, 0.95), .groups = 'drop')
+summary_df
+
+
+antherlen_3
+group_by(antherlen_3, Accession) %>%
+  summarise(
+    count = n(),
+    mean = mean(AntherLen, na.rm = TRUE), median = median(AntherLen,na.rm =TRUE),
+    sd = sd(AntherLen, na.rm = TRUE)
+  )
+install.packages("ggpubr")
+library(ggpubr)
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+antherplot2<-ggboxplot(antherlen_3, 
+                       x = "Accession", 
+                       y = "AntherLen", 
+                       color = "Accession", 
+                       fill = "Accession", 
+                       palette = border_colors, 
+                       order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                       ylab = "Anther Length (mm)", 
+                       xlab = "Accession",
+                       box.width = 0.3, 
+                       geom_params = list(size = 3)) +
+  geom_text(data = summary_df, 
+            aes(x = Accession, y = q4_anther_len, label = Group),
+            position = position_nudge(y = 0.4), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  scale_y_continuous(limits = c(1.0, NA)) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Anther Length by Accession")
+
+antherplot2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/antherlength_plot.jpg", plot = antherplot2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+#Anther length data analysis
+basalpore<-read.csv("C:/Users/afgut/vm_files/RiceData/BasalPore(R).csv")
+basalpore$Variety<-as.factor(basalpore$Variety)
+basalpore$Species<-as.factor(basalpore$Species)
+group_by(basalpore, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(BasalPore_mm, na.rm = TRUE), median = median(BasalPore_mm,na.rm =TRUE),
+    sd = sd(BasalPore_mm, na.rm = TRUE)
+  )
+
+# Initial graphic
+ggboxplot(basalpore, x = "Variety", y = "BasalPore_mm", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Basal Pore (mm)", xlab = "Accession",show.legend = FALSE)
+
+#ANOVA analysis of basal pore data
+basalpore.aov <- aov(BasalPore_mm ~ Variety, data = basalpore)
+basalpore_2.aov <- aov(BasalPore_mm ~ Species, data = basalpore)
+basalpore_3.aov <- aov(BasalPore_mm ~ Variety + Species, data = basalpore)
+
+# Summary of the ANOVA analysis
+summary(basalpore.aov)
+summary(basalpore_2.aov)
+summary(basalpore_3.aov)
+TukeyHSD(basalpore.aov)
+
+#adding tukey results to the graphics
+library(emmeans)
+library(multcompView)
+library(ggplot2)
+basalpore_contr <- emmeans::emmeans(object = basalpore.aov,
+                                   pairwise ~ "Variety",
+                                   adjust = "dunn")
+basalpore_means <- multcomp::cld(object = basalpore_contr$emmeans,
+                                Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+basalpore_means$Variety <- factor(basalpore_means$Variety, levels = desired_order)
+basalpore_means<-basalpore_means[match(desired_order,basalpore_means$Variety),]
+basalpore_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+basalpore_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+basalpore_means$Accession <- factor(basalpore_means$Accession, levels = desired_order3)
+basalpore_means<-basalpore_means[match(desired_order3,basalpore_means$Accession),]
+basalpore_means
+
+# Plot the data
+tiff("/Users/afgut/vm_files/RiceData/Basalpore.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+ggplot(data = basalpore_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Basal pore (mm)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+dev.off()
+
+
+pairwise.t.test(basalpore$BasalPore_mm, basalpore$Variety,
+                p.adjust.method = "BH")
+leveneTest(BasalPore_mm ~ Variety, data = basalpore)
+# Extract the residuals
+basalporeaov_residuals <- residuals(object = basalpore.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = basalporeaov_residuals )
+# ANOVA test with no assumption of equal variances
+oneway.test(basalpore$BasalPore_mm ~ basalpore$Variety, data = basalpore)
+
+#Pairwise t-tests with no assumption of equal variances
+pairwise.t.test(basalpore$BasalPore_mm, basalpore$Variety,
+                p.adjust.method = "BH",pool.sd=FALSE)
+
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(BasalPore_mm ~ Variety, data = basalpore)
+kruskal.test(BasalPore_mm ~ Species, data = basalpore)
+
+# Post Hoc analysis Kruskal
+install.packages("FSA")
+library(FSA)
+dunnTest(BasalPore_mm ~ Variety, data = basalpore)
+
+#Corrected graphics for paper after revision. The group variable added to the csv file is based on the emmeans analysis previously performed
+
+basalpore_3<-read.csv("C:/Users/afgut/vm_files/RiceData/BasalPore(R)_2.csv")
+basalpore_3
+levels(basalpore_3$Accession)
+library(dplyr)
+basalpore_3$Accession<-as.factor(basalpore_3$Accession)
+basalpore_3$Species<-as.factor(basalpore_3$Species)
+basalpore_3$Group<-as.factor(basalpore_3$Group)
+
+# Summarize data
+summarybasal_df <- basalpore_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_basalpore = quantile(BasalPore, 0.95), .groups = 'drop')
+summarybasal_df
+
+
+basalpore_3
+group_by(basalpore_3, Accession) %>%
+  summarise(
+    count = n(),
+    mean = mean(BasalPore, na.rm = TRUE), median = median(BasalPore,na.rm =TRUE),
+    sd = sd(BasalPore, na.rm = TRUE)
+  )
+library(ggpubr)
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+basalpore2<-ggboxplot(basalpore_3, 
+                       x = "Accession", 
+                       y = "BasalPore", 
+                       color = "Accession", 
+                       fill = "Accession", 
+                       palette = border_colors, 
+                       order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                       ylab = "Basal Pore (mm)", 
+                       xlab = "Accession",
+                       box.width = 0.3,
+                       geom_params = list(size = 3)) +
+  geom_text(data = summarybasal_df, 
+            aes(x = Accession, y = q4_basalpore, label = Group),
+            position = position_nudge(y = 0.05), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Dunn-test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Basal Pore Length by Accession")
+
+basalpore2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/basalpore_plot.jpg", plot = basalpore2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+#Papillae number data analysis
+papillaenum<-read.csv("C:/Users/afgut/vm_files/RiceData/PapillaeNum(R).csv")
+papillaenum$Variety<-as.factor(papillaenum$Variety)
+papillaenum$Species<-as.factor(papillaenum$Species)
+group_by(papillaenum, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PappillaeNum, na.rm = TRUE), median = median(PappillaeNum,na.rm =TRUE),
+    sd = sd(PappillaeNum, na.rm = TRUE)
+  )
+
+#Initial graphic
+ggboxplot(papillaenum, x = "Variety", y = "PappillaeNum", 
+          color = "Variety", palette = c("#39BEB1", "#ABB065", "#E7B800", "#FC4E07"),
+          order = c("105771N", "104735N", "105422R","80569R"),
+          ylab = "Papillae Number", xlab = "Variety")
+papillae.aov <- aov(PappillaeNum ~ Variety, data = papillaenum)
+# Summary of the analysis
+summary(papillae.aov)
+TukeyHSD(papillae.aov)
+
+#adding tukey results to the graphics
+papillae_contr <- emmeans::emmeans(object = papillae.aov,
+                                    pairwise ~ "Variety",
+                                    adjust = "tukey")
+papillae_means <- multcomp::cld(object = papillae_contr$emmeans,
+                                 Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "105422R", "80569R")
+
+# Convert the 'Variety' column to a factor with the desired order
+papillae_means$Variety <- factor(papillae_means$Variety, levels = desired_order)
+
+# Plot the data
+library(ggplot2)
+
+ggplot(data = papillae_means, aes(x = Variety, y = emmean, color = Variety)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.8), size = 2) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.2)) +
+  ylab("Papillae number") +
+  xlab("Variety") +
+  labs(caption = "Means followed by a common letter are not significantly different according to the Tukey-test") +
+  scale_color_manual(values = c("#39BEB1", "#ABB065", "#E7B800", "#FC4E07")) +
+  theme_classic()
+
+
+pairwise.t.test(papillaenum$PappillaeNum, papillaenum$Variety,
+                p.adjust.method = "BH")
+leveneTest(PappillaeNum ~ Variety, data = papillaenum)
+# Extract the residuals and shapiro test of residuals
+papillae.aov_residuals <- residuals(object = papillae.aov )
+shapiro.test(x = papillae.aov_residuals )
+
+#Pollen diameter data analysis
+pollensize<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenSize(R).csv")
+pollensize$Variety<-as.factor(pollensize$Variety)
+pollensize$Species<-as.factor(pollensize$Species)
+group_by(pollensize, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenSize_um, na.rm = TRUE), median = median(PollenSize_um,na.rm =TRUE),
+    sd = sd(PollenSize_um, na.rm = TRUE)
+  )
+
+#Initial graphic (Pollen diameter)
+ggboxplot(pollensize, x = "Variety", y = "PollenSize_um", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Pollen Size (um)", xlab = "Accession")
+
+#ANOVA analysis and summary
+pollensize.aov <- aov(PollenSize_um ~ Variety, data = pollensize)
+pollensize_2.aov <- aov(PollenSize_um ~ Species, data = pollensize)
+summary(pollensize.aov)
+summary(pollensize_2.aov)
+TukeyHSD(pollensize.aov)
+
+#adding tukey results to the graphics
+pollensize_contr <- emmeans::emmeans(object = pollensize.aov,
+                                    pairwise ~ "Variety",
+                                    adjust = "Dunn")
+pollensize_means <- multcomp::cld(object = pollensize_contr$emmeans,
+                                 Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+pollensize_means$Variety <- factor(pollensize_means$Variety, levels = desired_order)
+pollensize_means<-pollensize_means[match(desired_order,pollensize_means$Variety),]
+pollensize_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+pollensize_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+pollensize_means$Accession <- factor(pollensize_means$Accession, levels = desired_order3)
+pollensize_means<-pollensize_means[match(desired_order3,pollensize_means$Accession),]
+
+# Plot the data
+tiff("/Users/afgut/vm_files/RiceData/Pollensize.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+ggplot(data = pollensize_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Pollen diameter (um)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+dev.off()
+
+#T-test analysis
+pairwise.t.test(pollensize$PollenSize_um, pollensize$Variety,
+                p.adjust.method = "BH")
+
+#Homogeneity of variances test
+leveneTest(PollenSize_um ~ Variety, data = pollensize)
+# Extract the residuals
+pollensize.aov_residuals <- residuals(object = pollensize.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = pollensize.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+Pollensize.kw<-kruskal.test(PollenSize_um ~ Variety, data = pollensize)
+# Post Hoc analysis Kruskal
+dunnTest(PollenSize_um ~ Variety, data = pollensize)
+
+#Corrected graphic after paper revision. The group column added to the csv file is based on the Dunn test previously performed
+pollensize_3<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenSize(R)_2.csv")
+levels(pollensize_3$Accession)
+library(dplyr)
+pollensize_3$Accession<-as.factor(pollensize_3$Accession)
+pollensize_3$Species<-as.factor(pollensize_3$Species)
+pollensize_3$Group<-as.factor(pollensize_3$Group)
+
+# Summarize data
+summarypollen_df <- pollensize_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_pollensize = quantile(PollenSize, 0.99), .groups = 'drop')
+summarypollen_df
+
+pollensize_3
+group_by(pollensize_3, Accession) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenSize, na.rm = TRUE), median = median(PollenSize,na.rm =TRUE),
+    sd = sd(PollenSize, na.rm = TRUE)
+  )
+library(ggpubr)
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+pollensize2<-ggboxplot(pollensize_3, 
+                      x = "Accession", 
+                      y = "PollenSize", 
+                      color = "Accession", 
+                      fill = "Accession", 
+                      palette = border_colors, 
+                      order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                      ylab = "Pollen diameter (um)", 
+                      xlab = "Accession",
+                      box.width = 0.3,
+                      geom_params = list(size = 3)) +
+  geom_text(data = summarypollen_df, 
+            aes(x = Accession, y = q4_pollensize, label = Group),
+            position = position_nudge(y = 3), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Dunn-test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Pollen Diameter by Accession")
+
+pollensize2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/pollensize_plot.jpg", plot = pollensize2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+# Stigma length data analysis
+stigmalen<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaLen(R).csv")
+stigmalen$Variety<-as.factor(stigmalen$Variety)
+stigmalen$Species<-as.factor(stigmalen$Species)
+group_by(stigmalen, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(StigmaLen, na.rm = TRUE), median = median(StigmaLen,na.rm =TRUE),
+    sd = sd(StigmaLen, na.rm = TRUE))
+
+# Initial graphic stigma length
+ggboxplot(stigmalen, x = "Variety", y = "StigmaLen", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Stigma Length (mm)", xlab = "Accession")
+
+# ANOVA and summary
+stigmalen.aov <- aov(StigmaLen ~ Variety, data = stigmalen)
+stigmalen_2.aov <- aov(StigmaLen ~ Species, data = stigmalen)
+summary(stigmalen.aov)
+summary(stigmalen_2.aov)
+TukeyHSD(stigmalen.aov)
+
+#adding tukey results to the graphics
+stigmalen_contr <- emmeans::emmeans(object = stigmalen.aov,
+                                       pairwise ~ "Variety",
+                                       adjust = "tukey")
+stigmalen_means <- multcomp::cld(object = stigmalen_contr$emmeans,
+                                    Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+stigmalen_means$Variety <- factor(stigmalen_means$Variety, levels = desired_order)
+stigmalen_means<-stigmalen_means[match(desired_order,stigmalen_means$Variety),]
+stigmalen_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+stigmalen_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+stigmalen_means$Accession <- factor(stigmalen_means$Accession, levels = desired_order3)
+stigmalen_means<-stigmalen_means[match(desired_order3,stigmalen_means$Accession),]
+
+# Plot the data
+tiff("/Users/afgut/vm_files/RiceData/Stigmalen.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+ggplot(data = stigmalen_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Stigma length (mm)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Tukey HSD -test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+dev.off()
+
+# T-test analysis
+pairwise.t.test(stigmalen$StigmaLen_mm, stigmalen$Variety,
+                p.adjust.method = "BH")
+
+# Homogeneity of variances test (Levene test)
+leveneTest(StigmaLen ~ Variety, data = stigmalen)
+
+# Extract the residuals and SHapiro-Wilk test of residuals
+stigmalen.aov_residuals <- residuals(object = stigmalen.aov)
+shapiro.test(x = stigmalen.aov_residuals)
+
+
+#Corrected graphics of stigma length (mm). The group column is based on the Tukey HSD results.
+stigmalen_3<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaLen(R)_2.csv")
+stigmalen_3
+stigmalen_3$Accession<-as.factor(stigmalen_3$Accession)
+stigmalen_3$Species<-as.factor(stigmalen_3$Species)
+stigmalen_3$Group<-as.factor(stigmalen_3$Group)
+
+# Summarize data
+summarystigma_df <- stigmalen_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_stigmalen = quantile(StigmaLen, 0.99), .groups = 'drop')
+summarystigma_df
+
+group_by(stigmalen_3, Accession) %>%
+  summarise(count = n(),
+    mean = mean(StigmaLen, na.rm = TRUE), median = median(StigmaLen,na.rm =TRUE),
+    sd = sd(StigmaLen, na.rm = TRUE))
+
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+stigmalen2<-ggboxplot(stigmalen_3, 
+                       x = "Accession", 
+                       y = "StigmaLen", 
+                       color = "Accession", 
+                       fill = "Accession", 
+                       palette = border_colors, 
+                       order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                       ylab = "Stigma length  (mm)", 
+                       xlab = "Accession",
+                       box.width = 0.3,
+                       geom_params = list(size = 3)) +
+  geom_text(data = summarystigma_df, 
+            aes(x = Accession, y = q4_stigmalen, label = Group),
+            position = position_nudge(y = 0.2), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Tukey HSD test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Stigma length by Accession")
+
+stigmalen2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/stigmalen_plot.jpg", plot = stigmalen2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+# Panicle exsertion data analysis
+
+PanicleExertion<-read.csv("C:/Users/afgut/vm_files/RiceData/FlagLeaveD(R).csv")
+PanicleExertion$Variety<-as.factor(PanicleExertion$Variety)
+PanicleExertion$Species<-as.factor(PanicleExertion$Species)
+group_by(PanicleExertion, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(Distance, na.rm = TRUE), median = median(Distance,na.rm =TRUE),
+    sd = sd(Distance, na.rm = TRUE))
+
+ggboxplot(PanicleExertion, x = "Variety", y = "Distance", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Panicle Exertion (mm)", xlab = "Accession")
+
+#ANOVA and summary
+panicleexertion.aov <- aov(Distance ~ Variety, data = PanicleExertion)
+panicleexertion_2.aov <- aov(Distance ~ Species, data = PanicleExertion)
+summary(panicleexertion.aov)
+summary(panicleexertion_2.aov)
+
+#Post-ANOVA analysis
+TukeyHSD(panicleexertion.aov)
+
+# Homogeneity of variance and normality test (residuals)
+leveneTest(Distance ~ Variety, data = PanicleExertion)
+panicleexertion.aov_residuals <- residuals(object = panicleexertion.aov )
+shapiro.test(x = panicleexertion.aov_residuals)
+
+# Non-parametric alternative to one-way ANOVA test (data did not meet the requirements)
+kruskal.test(PollenSize_um ~ Variety, data = pollensize)
+# Post Hoc analysis Kruskal
+dunnTest(PollenSize_um ~ Variety, data = pollensize)
+
+#adding tukey results to the graphics
+panicleexertion_contr <- emmeans::emmeans(object = panicleexertion.aov,
+                                    pairwise ~ "Variety",
+                                    adjust = "tukey")
+panicleexertion_means <- multcomp::cld(object = panicleexertion_contr$emmeans,
+                                 Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+panicleexertion_means$Variety <- factor(panicleexertion_means$Variety, levels = desired_order)
+panicleexertion_means<-panicleexertion_means[match(desired_order,panicleexertion_means$Variety),]
+panicleexertion_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+panicleexertion_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+panicleexertion_means$Accession <- factor(panicleexertion_means$Accession, levels = desired_order3)
+panicleexertion_means<-panicleexertion_means[match(desired_order3,panicleexertion_means$Accession),]
+
+# Plot the data
+tiff("/Users/afgut/vm_files/RiceData/panicleexertion.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+ggplot(data = panicleexertion_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Panicle exsertion (mm)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Tukey HSD -test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+dev.off()
+
+#Panicle exsertion graphic after paper revision. Group column based on Tukey HSD test previously performed
+panicleexs_3<-read.csv("C:/Users/afgut/vm_files/RiceData/FlagLeaveD(R)_2.csv")
+panicleexs_3
+panicleexs_3$Accession<-as.factor(panicleexs_3$Accession)
+panicleexs_3$Species<-as.factor(panicleexs_3$Species)
+panicleexs_3$Group<-as.factor(panicleexs_3$Group)
+
+# Summarize data
+summarypanicleexs_df <- panicleexs_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_panicleexs = quantile(Distance, 0.99), .groups = 'drop')
+summarypanicleexs_df
+
+group_by(panicleexs_3, Accession) %>%
+  summarise(count = n(),
+            mean = mean(Distance, na.rm = TRUE), median = median(Distance,na.rm =TRUE),
+            sd = sd(Distance, na.rm = TRUE))
+
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+panicleexs2<-ggboxplot(panicleexs_3, 
+                      x = "Accession", 
+                      y = "Distance", 
+                      color = "Accession", 
+                      fill = "Accession", 
+                      palette = border_colors, 
+                      order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                      ylab = "Panicle exsertion  (mm)", 
+                      xlab = "Accession",
+                      box.width = 0.3,
+                      geom_params = list(size = 3)) +
+  geom_text(data = summarypanicleexs_df, 
+            aes(x = Accession, y = q4_panicleexs, label = Group),
+            position = position_nudge(y = 20), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Tukey HSD test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Panicle exsertion by Accession")
+
+panicleexs2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/panicleexs_plot.jpg", plot = panicleexs2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+
+# Papillae density (#fil/mm) data analysis
+
+StigmaDensity<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaDensity(R).csv")
+StigmaDensity$Variety<-as.factor(StigmaDensity$Variety)
+StigmaDensity$Species<-as.factor(StigmaDensity$Species)
+group_by(StigmaDensity, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(Stigmadensity, na.rm = TRUE), median = median(Stigmadensity,na.rm =TRUE),
+    sd = sd(Stigmadensity, na.rm = TRUE))
+
+#Initial graphic
+ggboxplot(StigmaDensity, x = "Variety", y = "Stigmadensity", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "# filaments/mm", xlab = "Accession")
+
+#ANOVA
+Stigmadensity.aov <- aov(Stigmadensity ~ Variety, data = StigmaDensity)
+Stigmadensity_2.aov <- aov(Stigmadensity ~ Species, data = StigmaDensity)
+summary(Stigmadensity.aov)
+summary(Stigmadensity_2.aov)
+TukeyHSD(Stigmadensity.aov)
+
+# Homogeneity of variance and normality test
+leveneTest(Stigmadensity ~ Variety, data = StigmaDensity)
+Stigmadensity.aov_residuals <- residuals(object = Stigmadensity.aov )
+shapiro.test(x = Stigmadensity.aov_residuals )
+
+pairwise.t.test(stigmalen$StigmaLen_mm, stigmalen$Variety,
+                p.adjust.method = "BH")
+
+install.packages("FSA")
+library(FSA)
+Stigmadensity_contr <- emmeans::emmeans(object = Stigmadensity.aov,
+                                        pairwise ~ "Variety",
+                                        adjust = "tukey")
+Stigmadensity_means <- multcomp::cld(object = Stigmadensity_contr$emmeans,
+                                     Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+Stigmadensity_means$Variety <- factor(Stigmadensity_means$Variety, levels = desired_order)
+Stigmadensity_means<-Stigmadensity_means[match(desired_order,Stigmadensity_means$Variety),]
+Stigmadensity_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+
+# Convert the 'Variety' column to a factor with the desired order
+Stigmadensity_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+Stigmadensity_means$Accession <- factor(Stigmadensity_means$Accession, levels = desired_order3)
+Stigmadensity_means<-Stigmadensity_means[match(desired_order3,Stigmadensity_means$Accession),]
+
+# Plot the data
+tiff("/Users/afgut/vm_files/RiceData/Stigmadensity.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+ggplot(data = Stigmadensity_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Papillae density (#filaments/mm)") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Tukey HSD test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+dev.off()
+
+#Correct graphic for paper (after revision)
+
+stigmadensity_3<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaDensity(R)_2.csv")
+stigmadensity_3
+stigmadensity_3$Accession<-as.factor(stigmadensity_3$Accession)
+stigmadensity_3$Species<-as.factor(stigmadensity_3$Species)
+stigmadensity_3$Group<-as.factor(stigmadensity_3$Group)
+
+# Summarize data
+summarystigmadensity_df <- stigmadensity_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_stigmadensity = quantile(Stigmadensity, 0.99), .groups = 'drop')
+summarystigmadensity_df
+
+group_by(stigmadensity_3, Accession) %>%
+  summarise(count = n(),
+            mean = mean(Stigmadensity, na.rm = TRUE), median = median(Stigmadensity,na.rm =TRUE),
+            sd = sd(Stigmadensity, na.rm = TRUE))
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+stigmadensity2<-ggboxplot(stigmadensity_3, 
+                       x = "Accession", 
+                       y = "Stigmadensity", 
+                       color = "Accession", 
+                       fill = "Accession", 
+                       palette = border_colors, 
+                       order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                       ylab = "Papillae density (#fil/mm)", 
+                       xlab = "Accession",
+                       box.width = 0.3,
+                       geom_params = list(size = 3)) +
+  geom_text(data = summarystigmadensity_df, 
+            aes(x = Accession, y = q4_stigmadensity, label = Group),
+            position = position_nudge(y = 2), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Tukey HSD test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Papillae density by Accession")
+
+stigmadensity2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/papillaedensity_plot.jpg", plot = stigmadensity2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+#Panicle angle analysis
+
+panicleangle<-read.csv("C:/Users/afgut/vm_files/RiceData/PanicleAngle(R).csv")
+panicleangle$Variety<-as.factor(panicleangle$Variety)
+panicleangle$Species<-as.factor(panicleangle$Species)
+group_by(panicleangle, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(Angle, na.rm = TRUE), median = median(Angle,na.rm =TRUE),
+    sd = sd(Angle, na.rm = TRUE))
+
+# Initial graphic
+ggboxplot(panicleangle, x = "Variety", y = "Angle", 
+          color = "Variety", palette = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44"),
+          order = c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506"),
+          ylab = "Panicle Angle", xlab = "Accession")
+
+# ANOVA analysis
+panicleangle.aov <- aov(Angle ~ Variety, data = panicleangle)
+panicleangle_2.aov <- aov(Angle ~ Species, data = panicleangle)
+summary(panicleangle.aov)
+summary(panicleangle_2.aov)
+
+# Levene test and Shapiro-Wilk test
+leveneTest(Angle ~ Variety, data = panicleangle)
+
+panicleangle.aov_residuals <- residuals(object = panicleangle.aov )
+shapiro.test(x = panicleangle.aov_residuals )
+
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(Angle ~ Variety, data = panicleangle)
+kruskal.test(Angle ~ Species, data = panicleangle)
+
+# Post Hoc analysis Kruskal
+dunnTest(Angle ~ Variety, data = panicleangle)
+
+panicleangle_contr <- emmeans::emmeans(object = panicleangle.aov,
+                                       pairwise ~ "Variety",
+                                       adjust = "dunn")
+panicleangle_means <- multcomp::cld(object = panicleangle_contr$emmeans,
+                                    Letters = letters)
+
+# Define the desired order of varieties
+desired_order <- c("105771N", "104735N", "IRGC_80470", "105422R","80569R", "IRGC_80506")
+
+# Convert the 'Variety' column to a factor with the desired order
+panicleangle_means$Variety <- factor(panicleangle_means$Variety, levels = desired_order)
+panicleangle_means<-panicleangle_means[match(desired_order,panicleangle_means$Variety),]
+panicleangle_means$Species<-c("O. nivara","O. nivara", "O. nivara", "O. rufipogon","O. rufipogon","O. rufipogon")
+
+panicleangle_means$Accession<-c("105771","104735","80470","105422","80569","80506")
+desired_order3<-c("105771","104735","80470","105422","80569","80506")
+panicleangle_means$Accession <- factor(panicleangle_means$Accession, levels = desired_order3)
+panicleangle_means<-panicleangle_means[match(desired_order3,panicleangle_means$Accession),]
+# Plot the data
+
+tiff("/Users/afgut/vm_files/RiceData/panicleangle.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+panicleangleplot<-ggplot(data = panicleangle_means, aes(x = Accession, y = emmean, color = Accession)) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Panicle angle") +
+  xlab("Accession") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn test") +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")) +
+  facet_wrap (vars(Species) , scales = "free_x") + theme_classic()
+panicleangleplot +  theme(legend.position = "none")
+dev.off()
+
+panicleangleplot
+
+# Corrected graphic after paper revision
+
+panicleangle_3<-read.csv("C:/Users/afgut/vm_files/RiceData/PanicleAngle(R)_2.csv")
+panicleangle_3
+panicleangle_3$Accession<-as.factor(panicleangle_3$Accession)
+panicleangle_3$Species<-as.factor(panicleangle_3$Species)
+panicleangle_3$Group<-as.factor(panicleangle_3$Group)
+
+# Summarize data
+summarypanicleangle_df <- panicleangle_3 %>%
+  group_by(Accession, Group, Species) %>%
+  summarize(q4_panicleangle = quantile(Angle, 0.99), .groups = 'drop')
+summarypanicleangle_df
+
+group_by(panicleangle_3, Accession) %>%
+  summarise(count = n(),
+            mean = mean(Angle, na.rm = TRUE), median = median(Angle,na.rm =TRUE),
+            sd = sd(Angle, na.rm = TRUE))
+
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colors <- c("#f69697", "#ff2c2c", "red4", "#17b9eb", "royalblue", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colors <- alpha(border_colors, 0.1)
+
+panicleangle2<-ggboxplot(panicleangle_3, 
+                          x = "Accession", 
+                          y = "Angle", 
+                          color = "Accession", 
+                          fill = "Accession", 
+                          palette = border_colors, 
+                          order = c("105771", "104735", "80470", "105422", "80569", "80506"),
+                          ylab = "Panicle angle", 
+                          xlab = "Accession",
+                          box.width = 0.3,
+                          geom_params = list(size = 3)) +
+  geom_text(data = summarypanicleangle_df, 
+            aes(x = Accession, y = q4_panicleangle, label = Group),
+            position = position_nudge(y = 7), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  facet_wrap(vars(Species), scales = "free_x") +
+  labs(caption = "Box-Plot followed by a common letter are not significantly different according to Dunn test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none",
+    strip.text = element_text(size = 14, face = "italic", family = "sans")
+  ) +
+  labs(title = "Panicle angle by Accession")
+
+panicleangle2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/panicleangle_plot.jpg", plot = panicleangle2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+
+# Analysis of the time-treatment data
+#Pollen viability data
+
+pollenvia_2<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_3(R).csv")
+pollenvia_2$Variety<-as.factor(pollenvia_2$Variety)
+pollenvia_2<-select(pollenvia_2,-Species)
+pollenvia_2$Species<-as.factor(pollenvia_2$Species)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(zoo)
+library(tidyr)
+colnames(pollenvia_2)
+pollenvia2_2 <- select(pollenvia_2, -Species)
+pollenvia2_2 <- dplyr::select(pollenvia_2, -Species) # Avoid conflict with other package
+melt.pollenvia2 <- melt(pollenvia2_2, id = c("Time","Variety"),value.name="Viability")
+melt.pollenvia2
+melt.pollenvia2$Variety <- factor(melt.pollenvia2$Variety, levels = c("105771N", "104735N", "105422R","80569R"))
+
+pollenmean2<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenMean_3(R).csv")
+View(pollenmean2)
+pollenmean2$Variety<-as.factor(pollenmean2$Variety)
+pollenmean2[is.na(pollenmean2)] <- 0
+pollenmean2
+
+pollenmean2$Variety <- factor(pollenmean2$Variety, levels = c("105771N", "104735N", "105422R","80569R"))
+
+plot.pollenmean3 <- ggplot(data = pollenmean2, aes(x = Time, y = Viability, group = Variety, color = Variety)) + 
+  geom_line(size = 1) + 
+  geom_errorbar(aes(ymin = Viability - SD, ymax = Viability + SD, color = Variety),width = 0.3, alpha = 0.5) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "#17b9eb", "royalblue")) +
+  xlab("Time (min)") + ylab("Pollen Viability") +  scale_x_continuous(breaks=c(0,15,30,45,60)) + theme_classic()
+plot.pollenmean3
+
+# Pollen decay graphic (1 - Viability)
+pollendecay2<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenViaDecay_3(R).csv")
+pollendecay2$Accession<-as.factor(pollendecay2$Accession)
+pollendecay2$Species<-as.factor(pollendecay2$Species)
+pollendecay2[is.na(pollendecay2)] <- 0
+colnames(pollendecay2)[1] <-"Accession"
+pollendecay2$Accession<-c("105771","104735","105422","80569")
+pollendecay2$Accession<-as.factor(pollendecay2$Accession)
+pollendecay2$Species<-c("O. nivara", "O. nivara", "O. rufipogon", "O. rufipogon")
+desired_order4<-c("105771","104735","105422","80569")
+pollendecay2$Accession<-factor(pollendecay2$Accession, levels =desired_order4)
+
+plot.pollendecay3 <- ggplot(data = pollendecay2, aes(x = Time, y = ViabilityDecay.2., group = Accession, color = Accession)) + 
+  geom_line(size = 1) + 
+  geom_errorbar(aes(ymin = ViabilityDecay.2. - SD, ymax = ViabilityDecay.2. + SD, color = Accession),width = 0.2, alpha = 0.4) +
+  geom_point(size = 3, shape = 18) +
+  scale_color_manual(values = c("#f69697","#ff2c2c", "#17b9eb",  "royalblue")) +
+  xlab("Time (min)") + ylab("Pollen Viability Decay")  + scale_x_continuous(breaks=c(0,15,30,45,60)) + scale_y_continuous(breaks=c(0,0.25,0.50,0.75,1)) + theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 14, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 14, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(size = 15, face = "bold", family = "sans")) +
+  labs(title = "Pollen Viability Decay by Accession")
+
+plot.pollendecay3
+
+jpeg("/Users/afgut/vm_files/RiceData/NewGraphics/pollendecay.jpg", units="in", width=6.5, height=3.4, res=600)
+plot.pollendecay3
+dev.off()
+
+# Pollen decay graphic after paper revision
+
+pollendecay2<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenViaDecay_3(R).csv")
+pollendecay2$Accession<-as.factor(pollendecay2$Accession)
+pollendecay2$Species<-as.factor(pollendecay2$Species)
+pollendecay2[is.na(pollendecay2)] <- 0
+desired_order4<-c("105771","104735","105422","80569")
+
+# Reorder the 'Accession' factor levels according to the desired order
+pollendecay2$Accession <- factor(pollendecay2$Accession, levels = desired_order4)
+
+# Ensure that the levels are ordered as specified
+levels(pollendecay2$Accession)
+
+# Create a new factor combining 'Accession' and 'Species'
+pollendecay2$Accession_Species <- with(pollendecay2, factor(paste(Accession, Species, sep = " - ")))
+
+# Ensure the new factor respects the desired order for 'Accession'
+pollendecay2 <- pollendecay2 %>%
+  arrange(match(Accession, desired_order4)) %>%
+  mutate(Accession_Species = factor(Accession_Species, levels = unique(Accession_Species)))
+
+# Verify the new combined factor
+head(pollendecay2$Accession_Species)
+
+# Create the plot
+plot.pollendecay2 <- ggplot(data = pollendecay2, aes(x = Time, y = ViabilityDecay, group = Accession_Species, color = Accession_Species)) + 
+  geom_line(size = 1) + 
+  geom_errorbar(aes(ymin = ViabilityDecay - SD, ymax = ViabilityDecay + SD), width = 0.3, alpha = 0.5) +
+  geom_point(size = 3, shape = 18) +
+  scale_color_manual(values = c("#f69697","#ff2c2c", "#17b9eb", "royalblue")) +
+  xlab("Time (min)") + 
+  ylab("Pollen Viability Decay") + 
+  scale_x_continuous(breaks = c(0, 15, 30, 45, 60)) + 
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 12, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(size = 13, face = "bold", family = "sans"),
+    legend.title = element_text(size = 10, face = "bold", family = "sans"),
+    legend.text = element_text(size = 8, family = "sans")
+  ) +
+  labs(title = "Pollen Viability Decay by Accession", color = "Accession - Species")
+
+plot.pollendecay2
+
+jpeg("/Users/afgut/vm_files/RiceData/NewGraphics/pollendecay.jpg", units="in", width=6.5, height=3.4, res=600)
+plot.pollendecay2
+dev.off()
+
+#ANOVA analysis pollen viability per time
+
+Pollenvia_0<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_Time0(R).csv")
+Pollenvia_0$Variety<-as.factor(Pollenvia_0$Variety)
+Pollenvia_0$Species<-as.factor(Pollenvia_0$Species)
+group_by(Pollenvia_0, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenVia, na.rm = TRUE), median = median(PollenVia,na.rm =TRUE),
+    sd = sd(PollenVia, na.rm = TRUE))
+
+Pollenvia_0.aov <- aov(PollenVia ~ Variety, data = Pollenvia_0)
+Pollenvia_0_2.aov <- aov(PollenVia ~ Species, data = Pollenvia_0)
+# Summary of the analysis
+summary(Pollenvia_0.aov)
+summary(Pollenvia_0_2.aov)
+
+
+TukeyHSD(Pollenvia_0.aov)
+
+leveneTest(PollenVia ~ Variety, data = Pollenvia_0)
+# Extract the residuals
+Pollenvia_0.aov_residuals <- residuals(object = Pollenvia_0.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Pollenvia_0.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(PollenVia ~ Variety, data = Pollenvia_0)
+# Post Hoc analysis Kruskal
+dunnTest(PollenVia ~ Variety, data = Pollenvia_0)
+
+Pollenvia_15<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_Time15(R).csv")
+Pollenvia_15$Variety<-as.factor(Pollenvia_15$Variety)
+Pollenvia_15$Species<-as.factor(Pollenvia_15$Species)
+group_by(Pollenvia_15, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenVia, na.rm = TRUE), median = median(PollenVia,na.rm =TRUE),
+    sd = sd(PollenVia, na.rm = TRUE))
+
+Pollenvia_15.aov <- aov(PollenVia ~ Variety, data = Pollenvia_15)
+Pollenvia_15_2.aov <- aov(PollenVia ~ Species, data = Pollenvia_15)
+# Summary of the analysis
+summary(Pollenvia_15.aov)
+summary(Pollenvia_15_2.aov)
+
+
+TukeyHSD(Pollenvia_15.aov)
+
+leveneTest(PollenVia ~ Variety, data = Pollenvia_15)
+# Extract the residuals
+Pollenvia_15.aov_residuals <- residuals(object = Pollenvia_15.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Pollenvia_15.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(PollenVia ~ Variety, data = Pollenvia_15)
+# Post Hoc analysis Kruskal
+dunnTest(PollenVia ~ Variety, data = Pollenvia_15)
+
+
+Pollenvia_30<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_Time30(R).csv")
+Pollenvia_30$Variety<-as.factor(Pollenvia_30$Variety)
+Pollenvia_30$Species<-as.factor(Pollenvia_30$Species)
+group_by(Pollenvia_30, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenVia, na.rm = TRUE), median = median(PollenVia,na.rm =TRUE),
+    sd = sd(PollenVia, na.rm = TRUE))
+
+Pollenvia_30.aov <- aov(PollenVia ~ Variety, data = Pollenvia_30)
+Pollenvia_30_2.aov <- aov(PollenVia ~ Species, data = Pollenvia_30)
+# Summary of the analysis
+summary(Pollenvia_30.aov)
+summary(Pollenvia_30_2.aov)
+
+
+TukeyHSD(Pollenvia_30.aov)
+
+leveneTest(PollenVia ~ Variety, data = Pollenvia_30)
+# Extract the residuals
+Pollenvia_30.aov_residuals <- residuals(object = Pollenvia_30.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Pollenvia_30.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(PollenVia ~ Variety, data = Pollenvia_30)
+# Post Hoc analysis Kruskal
+dunnTest(PollenVia ~ Variety, data = Pollenvia_30)
+
+Pollenvia_45<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_Time45(R).csv")
+Pollenvia_45$Variety<-as.factor(Pollenvia_45$Variety)
+Pollenvia_45$Species<-as.factor(Pollenvia_45$Species)
+group_by(Pollenvia_45, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenVia, na.rm = TRUE), median = median(PollenVia,na.rm =TRUE),
+    sd = sd(PollenVia, na.rm = TRUE))
+
+Pollenvia_45.aov <- aov(PollenVia ~ Variety, data = Pollenvia_45)
+Pollenvia_45_2.aov <- aov(PollenVia ~ Species, data = Pollenvia_45)
+# Summary of the analysis
+summary(Pollenvia_45.aov)
+summary(Pollenvia_45_2.aov)
+
+
+TukeyHSD(Pollenvia_45.aov)
+
+leveneTest(PollenVia ~ Variety, data = Pollenvia_45)
+# Extract the residuals
+Pollenvia_45.aov_residuals <- residuals(object = Pollenvia_45.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Pollenvia_45.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(PollenVia ~ Variety, data = Pollenvia_45)
+# Post Hoc analysis Kruskal
+dunnTest(PollenVia ~ Variety, data = Pollenvia_45)
+
+Pollenvia_60<-read.csv("C:/Users/afgut/vm_files/RiceData/PollenVia_Time60(R).csv")
+Pollenvia_60$Variety<-as.factor(Pollenvia_60$Variety)
+Pollenvia_60$Species<-as.factor(Pollenvia_60$Species)
+group_by(Pollenvia_60, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(PollenVia, na.rm = TRUE), median = median(PollenVia,na.rm =TRUE),
+    sd = sd(PollenVia, na.rm = TRUE))
+
+Pollenvia_60.aov <- aov(PollenVia ~ Variety, data = Pollenvia_60)
+Pollenvia_60_2.aov <- aov(PollenVia ~ Species, data = Pollenvia_60)
+# Summary of the analysis
+summary(Pollenvia_60.aov)
+summary(Pollenvia_60_2.aov)
+
+
+TukeyHSD(Pollenvia_60.aov)
+
+leveneTest(PollenVia ~ Variety, data = Pollenvia_60)
+# Extract the residuals
+Pollenvia_60.aov_residuals <- residuals(object = Pollenvia_60.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Pollenvia_60.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(PollenVia ~ Variety, data = Pollenvia_60)
+# Post Hoc analysis Kruskal
+dunnTest(PollenVia ~ Variety, data = Pollenvia_60)
+
+
+# Stigma receptivity data
+
+stigmarecep<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaRecep(R).csv")
+stigmarecep$Variety<-as.factor(stigmarecep$Variety)
+stigmarecep2<-select(stigmarecep,-Species)
+stigmarecep$Species<-as.factor(stigmarecep$Species)
+
+stigmarecep2 <- dplyr::select(stigmarecep, -Species) # Avoid conflict with other package
+melt.stigmarecep2 <- melt(stigmarecep2, id = c("Time","Variety"),value.name="StigmaRecep")
+melt.stigmarecep2
+melt.stigmarecep2$Variety <- factor(melt.stigmarecep2$Variety, levels = c("105771N", "104735N", "105422R","80569R"))
+
+stigmarecmean<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaMean(R).csv")
+stigmarecmean$Variety<-as.factor(stigmarecmean$Variety)
+
+stigmarecmean$Variety <- factor(stigmarecmean$Variety, levels = c("105771N", "104735N", "105422R","80569R"))
+
+plot.stigmarecmean2 <- ggplot(data = stigmarecmean, aes(x = Time, y = Receptivity, group = Variety, color = Variety)) + 
+  geom_line(size = 1) + 
+  geom_errorbar(aes(ymin = Receptivity - SD, ymax = Receptivity + SD, color = Variety), alpha = 0.5) +
+  scale_color_manual(values = c("#f69697", "#ff2c2c", "#17b9eb", "royalblue")) +  # Specify colors here
+  scale_fill_manual(values = c("#f69697", "#ff2c2c", "#17b9eb", "royalblue")) +    # Specify fill colors for the ribbon here
+  xlab("Time (min)") + ylab("Stigma Receptivity") + scale_x_continuous(breaks=c(0,15,30,45,60,75,90)) + theme_classic()
+plot.stigmarecmean2
+
+stigmarecep_3<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaRecep_2(R).csv")
+stigmarecep_3$Variety<-as.factor(stigmarecep_3$Variety)
+stigmarecep4<-select(stigmarecep_3,-Species)
+stigmarecep_3$Species<-as.factor(stigmarecep_3$Species)
+
+stigmarecep4 <- dplyr::select(stigmarecep_3, -Species) # Avoid conflict with other package
+melt.stigmarecep4 <- melt(stigmarecep4, id = c("Time","Variety"),value.name="StigmaRecep")
+melt.stigmarecep4
+melt.stigmarecep4$Variety <- factor(melt.stigmarecep4$Variety, levels = c("105771N", "104735N", "105422R","80569R"))
+
+plot.stigmarecep4 <- ggplot(melt.stigmarecep4, aes(Time, StigmaRecep, color = Variety, scale_color_manual(values = c("#f69697", "#ff2c2c", "#17b9eb", "royalblue")))) +
+  geom_point() + scale_color_manual(values = c("#f69697", "#ff2c2c", "#17b9eb", "royalblue")) +xlab("Time (min)")+ylab("Stigma Receptivity") +scale_x_continuous(breaks=c(0,15,30,45,60)) +theme_classic()
+
+plot.stigmarecep4
+
+# Stigma receptivity graphic after paper revision
+
+stigmarecmean<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaMean_3(R).csv")
+stigmarecmean$Accession<-as.factor(stigmarecmean$Accession)
+stigmarecmean$Species<-as.factor(stigmarecmean$Species)
+
+# Define the desired order for 'Accession'
+desired_order <- c("105771", "104735", "105422", "80569")
+# Reorder the 'Accession' factor levels according to the desired order
+stigmarecmean$Accession <- factor(stigmarecmean$Accession, levels = desired_order)
+# Ensure that the levels are ordered as specified
+levels(stigmarecmean$Accession)
+# Create a new factor combining 'Accession' and 'Species'
+stigmarecmean$Accession_Species <- with(stigmarecmean, factor(paste(Accession, Species, sep = " - ")))
+# Ensure the new factor respects the desired order for 'Accession'
+stigmarecmean <- stigmarecmean %>%
+  arrange(match(Accession, desired_order)) %>%
+  mutate(Accession_Species = factor(Accession_Species, levels = unique(Accession_Species)))
+# Verify the new combined factor
+head(stigmarecmean$Accession_Species)
+
+plot.stigmarecmean4 <- ggplot(data = stigmarecmean, aes(x = Time, y = ReceptivityMean, group = Accession_Species, color = Accession_Species)) + 
+  geom_line(size = 1) + 
+  geom_errorbar(aes(ymin = ReceptivityMean - SDMean, ymax = ReceptivityMean + SDMean), width = 0.3, alpha = 0.5) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("#f69697","#ff2c2c","#17b9eb", "royalblue")) +
+  xlab("Time (min)") + 
+  ylab("Stigma Receptivity") + 
+  scale_x_continuous(breaks = c(0, 15, 30, 45, 60)) + 
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 14, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 14, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(size = 15, face = "bold", family = "sans"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(title = "Stigma Receptivity by Accession", color = "Accession - Species")
+
+
+plot.stigmarecmean4
+
+jpeg("/Users/afgut/vm_files/RiceData/NewGraphics/stigmarecmean.jpg", units="in", width=6.5, height=3.4, res=600)
+plot.stigmarecmean4
+dev.off()
+
+# ANOVA analysis of stigma receptiity per time
+
+StigmaRecep_0<-read.csv("C:/Users/afgut/vm_files/RiceData/StigmaRecep_Time0(R).csv")
+StigmaRecep_0$Variety<-as.factor(StigmaRecep_0$Variety)
+StigmaRecep_0$Species<-as.factor(StigmaRecep_0$Species)
+group_by(StigmaRecep_0, Variety) %>%
+  summarise(
+    count = n(),
+    mean = mean(StigmaRecep, na.rm = TRUE), median = median(StigmaRecep,na.rm =TRUE),
+    sd = sd(StigmaRecep, na.rm = TRUE))
+StigmaRecep_0.aov <- aov(StigmaRecep ~ Variety, data = StigmaRecep_0)
+StigmaRecep_0_2.aov <- aov(StigmaRecep ~ Species, data = StigmaRecep_0)
+# Summary of the analysis
+summary(StigmaRecep_0.aov)
+summary(StigmaRecep_0_2.aov)
+
+
+TukeyHSD(StigmaRecep_0.aov)
+
+leveneTest(StigmaRecep ~ Variety, data = StigmaRecep_0)
+# Extract the residuals
+StigmaRecep_0.aov_residuals <- residuals(object = StigmaRecep_0.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = StigmaRecep_0.aov_residuals )
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(StigmaRecep ~ Variety, data = StigmaRecep_0)
+# Post Hoc analysis Kruskal
+dunnTest(StigmaRecep ~ Variety, data = StigmaRecep_0)
+
+# Early dehis data 
+
+earlydeh<-read.csv("C:/Users/afgut/vm_files/RiceData/EarlyDehis.csv")
+earlydeh
+levels(earlydeh$Species)
+library(dplyr)
+earlydeh$Species<-as.factor(earlydeh$Species)
+group_by(earlydeh, Species) %>%
+  summarise(
+    count = n(),
+    mean = mean(EarlyDeh, na.rm = TRUE), median = median(EarlyDeh,na.rm =TRUE),
+    sd = sd(EarlyDeh, na.rm = TRUE)
+  )
+
+# ANOVA analysis
+earlydeh.aov <- aov(EarlyDeh ~ Species , data = earlydeh)
+summary(earlydeh.aov)
+
+
+TukeyHSD(earlydeh.aov)
+# Testing requirement for ANOVA 
+leveneTest(EarlyDeh ~ Species, data = earlydeh)
+# Extract the residuals
+Earlydehaov_residuals <- residuals(object = earlydeh.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = Earlydehaov_residuals )
+
+# Non-parametric alternative to one-way ANOVA test
+kruskal.test(EarlyDeh ~ Species, data = earlydeh)
+
+# Post Hoc analysis Kruskal
+dunnTest(EarlyDeh ~ Species, data = earlydeh)
+
+library(multcomp)
+
+earlydeh_contr <- emmeans::emmeans(object = earlydeh.aov,
+                                    pairwise ~ "Species",
+                                    adjust = "dunn")
+print(earlydeh_contr)
+earlydeh_means <- multcomp::cld(object = earlydeh_contr$emmeans,
+                                 Letters = letters)
+
+
+
+# Convert the 'Variety' column to a factor with the desired order
+earlydeh_means$Species <- factor(earlydeh_means$Species)
+earlydeh_means
+earlydeh_means$Species2<-c("O. rufipogon" ,"O. nivara")
+colnames(earlydeh_means)[1] <-"Species_2"
+colnames(earlydeh_means)[8] <-"Species"
+# Plot the data
+
+tiff("/Users/afgut/vm_files/RiceData/earlydeh.tiff", units="in", width=7.7, height=4.4, res=300, compression = 'lzw')
+
+ggplot(data = earlydeh_means,aes(x = Species, y = emmean, color = Species)) + 
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.3)) +
+  ylab("Early dehiscense") +
+  xlab("Species") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test") +
+  scale_color_manual(values = c("red4","#141c44")) + theme_classic()
+dev.off()
+
+# Corrected graphics after paper revision
+
+earlydehis_2<-read.csv("C:/Users/afgut/vm_files/RiceData/EarlyDehis_2.csv")
+earlydehis_2
+earlydehis_2$Species<-as.factor(earlydehis_2$Species)
+earlydehis_2$Group<-as.factor(earlydehis_2$Group)
+
+# Summarize data
+summary_df <- earlydehis_2 %>%
+  group_by(Group, Species) %>%
+  summarize(q3_EarlyDeh = quantile(EarlyDeh, 0.75), .groups = 'drop')
+summary_df
+
+
+group_by(earlydehis_2, Species) %>%
+  summarise(
+    count = n(),
+    mean = mean(EarlyDeh, na.rm = TRUE), median = median(EarlyDeh,na.rm =TRUE),
+    sd = sd(EarlyDeh, na.rm = TRUE)
+  )
+library(ggpubr)
+library(scales)  # For the 'alpha' function to adjust color transparency
+
+# Define the color palette for borders
+border_colorsearly <- c("red4", "#141c44")
+
+# Convert the border colors to lighter fill colors with 25% opacity
+fill_colorsearly <- alpha(border_colorsearly, 0.1)
+
+earlyplot2<-ggboxplot(earlydehis_2, 
+                       x = "Species", 
+                       y = "EarlyDeh", 
+                       color = "Species", 
+                       fill = "Species", 
+                       palette = border_colorsearly, 
+                       order = c("O. nivara", "O. rufipogon"),
+                       ylab = "Early dehiscense", 
+                       xlab = "Species",
+                       box.width = 0.2, 
+                       geom_params = list(size = 3)) +
+  geom_text(data = summary_df, 
+            aes(x = Species, y = q3_EarlyDeh, label = Group),
+            position = position_nudge(y = 1.25), 
+            size = 12 / .pt, 
+            fontface = "bold",family = "sans") +
+  scale_fill_manual(values = fill_colorsearly) +
+  labs(caption = "Means followed by a common letter are not significantly different according to Dunn-test", family ="sans") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.title.x = element_text(size = 16, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 16, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 12, face = "italic"),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    legend.position = "none") +
+  labs(title = "Early dehiscense by species")
+
+earlyplot2
+
+# Save the plot as a JPEG file with 600 dpi resolution
+ggsave(filename = "C:/Users/afgut/vm_files/RiceData/NewGraphics/earlydeh_plot.jpg", plot = earlyplot2, device = "jpeg", dpi = 600, width = 8, height = 5, units = "in")
+
+
+# Flower data analysis
+
+flowerdata_single<-read.csv("C:/Users/afgut/vm_files/RiceData/flowerdata_Singleflower.csv")
+flowerdata_panicle<-read.csv("C:/Users/afgut/vm_files/RiceData/flowerdata_Panicle.csv")
+flowerdata_whole<-read.csv("C:/Users/afgut/vm_files/RiceData/flowerdata_wholeplant.csv")
+flowerdata_all<-read.csv("C:/Users/afgut/vm_files/RiceData/flowerdata_all.csv")
+
+flowerdata_single$Species<-as.factor(flowerdata_single$Species)
+flowerdata_panicle$Species<-as.factor(flowerdata_panicle$Species)
+flowerdata_whole$Species<-as.factor(flowerdata_whole$Species)
+flowerdata_all$Species<-as.factor(flowerdata_all$Species)
+flowerdata_all$treatment<-as.factor(flowerdata_all$Treatment)
+
+
+group_by(flowerdata_all, Species, Treatment) %>%
+  summarise(
+    count = n(),
+    mean = mean(Seedpre, na.rm = TRUE), median = median(Seedpre,na.rm =TRUE),
+    sd = sd(Seedpre, na.rm = TRUE)
+  )
+
+flowerdata_all.aov <- aov(Seedpre ~ Treatment * Species , data = flowerdata_all)
+
+# Summary of the analysis
+summary(flowerdata_all.aov)
+
+
+TukeyHSD(flowerdata_all.aov)
+
+leveneTest(Seedpre ~ Treatment * Species , data = flowerdata_all)
+# Extract the residuals
+flowerdata_allaov_residuals <- residuals(object = flowerdata_all.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = flowerdata_allaov_residuals )
+library (multcomp)
+library(multcompView)
+library(emmeans)
+
+flowerdata_contr <- emmeans::emmeans(object = flowerdata_all.aov,
+                                   pairwise ~ "Treatment*Species",
+                                   adjust = "tukey")
+flowerdata_means <- multcomp::cld(object = flowerdata_contr$emmeans,
+                                Letters = letters)
+
+
+
+# Convert the 'Treatment' column to a factor with the desired order
+flowerdata_means$Treatment <- factor(flowerdata_means$Treatment)
+flowerdata_means$Species <- factor(flowerdata_means$Species)
+
+
+desired_order2<-c("0.1","0.32","0.748", "0.7","0.854","0.834")
+
+
+flowerdata_means<-flowerdata_means[match(desired_order2,flowerdata_means$emmean),]
+flowerdata_means$emmean <- as.numeric(flowerdata_means$emmean)
+
+flowerdata_means$Treatment2<-c("Seed (Single)","Single Panicle", "Whole Plant", "Seed (Single)","Single Panicle", "Whole Plant")
+colnames(flowerdata_means)[2] <- "Species_2"
+flowerdata_means$Species<-c("O. rufipogon", "O. rufipogon", "O. rufipogon", "O. nivara", "O. nivara", "O. nivara")
+
+library(ggplot2)
+
+#Graphic proportion seed set by species
+
+flowerdataplot<-ggplot(data = flowerdata_means,aes(x = Species, y = emmean, fill = Species)) + 
+  geom_bar(stat="identity",color="black", position=position_dodge()) +
+  geom_errorbar(aes(ymin = emmean, ymax = upper.CL), width = 0.2, position=position_dodge(.7)) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(y = 0.325)) +
+  ylab("Proportion Seed Set") +
+  xlab("Species") +
+  labs(caption = "Means followed by a common letter are not significantly different according to Tukey-test") +
+  scale_fill_manual(values = c("red4","#141c44")) + facet_wrap (vars(Treatment2) , scales = "free_x") + 
+  scale_y_continuous(breaks=c(0,0.5,1)) +
+theme_classic(base_size = 12) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", family = "sans"),
+    axis.title.y = element_text(size = 12, face = "bold", family = "sans"),
+    axis.text.x = element_text(size = 10, face = "italic"),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(size = 13, face = "bold", family = "sans"),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 10, face = "italic")
+  ) +
+  labs(title = "Proportion seed set by species")
+
+flowerdataplot
+
+jpeg("/Users/afgut/vm_files/RiceData/NewGraphics/flowerdata_seedset.jpg", units="in", width=6.5, height=3.4, res=600)
+flowerdataplot
+dev.off()
+
+# Citations for the paper
+
+citation("ggpubr")
+citation("emmeans")
+citation("multcompView")
+citation ()
+R.Version()
+packageVersion("ggplot2")
+
+# Early dehiscense graphic with accession data
+
+earlydeh_means$Accession<-c("80506","80470")
+colnames(earlydeh_means)[9] <- "Accession_2"
+
+earlydehplot<-ggplot(data = earlydeh_means,aes(x = Species, y = emmean, color = Accession)) + 
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
+  geom_point(position = position_dodge(width = 0.5), shape = 15, size = 2) +
+  geom_text(aes(label = gsub(" ", "", .group)), position = position_nudge(x = 0.1)) +
+  ylab("Early anther dehiscense") +
+  xlab("Species") +
+  scale_color_manual(values = c("red4","#141c44")) + theme_classic()
+earlydehplot
+
+earlydehplot2<-earlydehplot +  theme(legend.position = "none")
+
+tiff("/Users/afgut/vm_files/RiceData/earlydehplot3.tiff", units="in", width=5.75,height=4.0, res=600, compression = 'lzw')
+earlydehplot2
+dev.off()
+
+tiff("/Users/afgut/vm_files/RiceData/CombinedGraphic_1.tiff", units="cm", width=17, res=600, compression = 'lzw')
+ggarrange(antherlenplot2,basalporeplot2,panicleangleplot2,panicleexserplot2,Stigmadenplot2,earlydehplot2, labels = c("A","B","C", "D", "E", "F"),ncol = 3, nrow = 2)
+dev.off()
+
+# MANOVA analysis
+
+Man_antlengbasalp<-read.csv("C:/Users/afgut/vm_files/RiceData/Man_antlen&basal.csv")
+library(dplyr)
+install.packages("mvnormtest")
+library(mvnormtest)
+# dataframe to matrix for shapiro test
+matrixantlenbasal<-t(Man_antlengbasalp[,2:4])
+mshapiro.test(matrixantlenbasal)
+# data non-normal, it is need it a box-cox transformation for normality
+
+# load MASS package
+library(MASS)
+
+head(Man_antlengbasalp)
+
+# Box-Cox transformation for anther length
+boxcox_Antherlen <- boxcox(Man_antlengbasalp$Anther_length ~ 1, lambda = seq(-3, 3, by = 0.1))
+optimal_lambda_Antherlen <- boxcox_Antherlen$x[which.max(boxcox_Antherlen$y)]
+
+# Box-Cox transformation for basal pore
+boxcox_Basalpore <- boxcox(Man_antlengbasalp$Basal_pore ~ 1, lambda = seq(-3, 3, by = 0.1))
+optimal_lambda_Basalpore <- boxcox_Basalpore$x[which.max(boxcox_Basalpore$y)]
+
+# Data must be positive and > 0
+# Check the minimum value in the data
+min_value <- min(Man_antlengbasalp$Basal_pore)
+print(min_value)
+
+if (min_value <= 0) {
+  # Shift the data
+  shift_value <- abs(min_value) + 1
+  Man_antlengbasalp$Basal_pore_shifted <- Man_antlengbasalp$Basal_pore + shift_value
+} else {
+  Man_antlengbasalp$Basal_pore_shifted <- Man_antlengbasalp$Basal_pore
+}
+
+# Perform Box-Cox transformation on the shifted data
+boxcox_Basalpore <- boxcox(Man_antlengbasalp$Basal_pore_shifted ~ 1, lambda = seq(-3, 3, by = 0.1))
+
+# Find the optimal lambda
+optimal_lambda_Basalpore <- boxcox_Basalpore$x[which.max(boxcox_Basalpore$y)]
+
+# Print the optimal lambda values
+optimal_lambda_Antherlen
+optimal_lambda_Basalpore
+
+# Function to apply Box-Cox transformation
+boxcox_transform <- function(x, lambda) {
+  if (lambda == 0) {
+    return(log(x))
+  } else {
+    return((x^lambda - 1) / lambda)
+  }
+}
+
+# Apply the transformation to the shifted data
+Man_antlengbasalp$Basal_pore_transformed <- boxcox_transform(Man_antlengbasalp$Basal_pore_shifted, optimal_lambda_Basalpore)
+
+# Apply the transformation to anther length
+Man_antlengbasalp$Antherlen_transformed <- boxcox_transform(Man_antlengbasalp$Anther_length, optimal_lambda_Antherlen)
+
+# View the transformed data
+head(Man_antlengbasalp)
+
+# dataframe to matrix for shapiro test
+# Extract and transpose relevant columns from the dataframe
+matrixantlenbasaltrans <- t(as.matrix(Man_antlengbasalp[, c(2, 6, 7)]))
+
+# Perform the Shapiro-Wilk test for multivariate normality
+mshapiro_resulttran <- mshapiro.test(matrixantlenbasaltrans)
+
+# Display the results
+print(mshapiro_resulttran)
+
+# MANOVA test
+antbas.man <- manova(cbind(Basal_pore_transformed, Antherlen_transformed) ~ Accession, data = Man_antlengbasalp)
+summary(antbas.man)
+summary.aov(antbas.man)
+
+
+Man_panicle<-read.csv("C:/Users/afgut/vm_files/RiceData/Man_panicle.csv")
+# dataframe to matrix for shapiro test
+matrixpanicle<-t(Man_panicle[,2:4])
+mshapiro.test(matrixpanicle)
+# data non-normal, it is need it a box-cox transformation for normality
+
+head(Man_panicle)
+
+# Box-Cox transformation for panicle angle
+boxcox_Panicleangle <- boxcox(Man_panicle$Panicle_angle ~ 1, lambda = seq(-3, 3, by = 0.1))
+optimal_lambda_Panicleangle <- boxcox_Panicleangle$x[which.max(boxcox_Panicleangle$y)]
+
+# Data must be positive and > 0
+
+# Check the minimum value in the data
+min_valueangle <- min(Man_panicle$Panicle_angle)
+print(min_valueangle)
+
+if (min_valueangle <= 0) {
+  # Shift the data
+  shift_valueangle <- abs(min_valueangle) + 1
+  Man_panicle$Panicle_angle_shifted <- Man_panicle$Panicle_angle + shift_valueangle
+} else {
+  Man_panicle$Panicle_angle_shifted <- Man_panicle$Panicle_angle
+}
+
+# Perform Box-Cox transformation on the shifted data
+boxcox_Panicleangle <- boxcox(Man_panicle$Panicle_angle_shifted ~ 1, lambda = seq(-3, 3, by = 0.1))
+
+# Find the optimal lambda
+optimal_lambda_Panicleangle <- boxcox_Panicleangle$x[which.max(boxcox_Panicleangle$y)]
+
+# Box-Cox transformation for panicle exsertion
+
+# Data must be positive and > 0
+
+# Check the minimum value in the data
+min_valueexser <- min(Man_panicle$Panicle_exsertion)
+print(min_valueexser)
+
+if (min_valueexser <= 0) {
+  # Shift the data
+  shift_valueexser <- abs(min_valueexser) + 1
+  Man_panicle$Panicle_exsertion_shifted <- Man_panicle$Panicle_exsertion + shift_valueexser
+} else {
+  Man_panicle$Panicle_exsertion_shifted <- Man_panicle$Panicle_exsertion
+}
+
+# Perform Box-Cox transformation on the shifted data
+boxcox_Panicleexsertion <- boxcox(Man_panicle$Panicle_exsertion_shifted ~ 1, lambda = seq(-3, 3, by = 0.1))
+
+# Find the optimal lambda
+optimal_lambda_Panicleexsertion <- boxcox_Panicleexsertion$x[which.max(boxcox_Panicleexsertion$y)]
+
+# Print the optimal lambda values
+optimal_lambda_Panicleangle
+optimal_lambda_Panicleexsertion
+
+# Function to apply Box-Cox transformation
+boxcox_transform <- function(x, lambda) {
+  if (lambda == 0) {
+    return(log(x))
+  } else {
+    return((x^lambda - 1) / lambda)
+  }
+}
+
+# Apply the transformation to the shifted data
+Man_panicle$Panicleexsertion_transformed <- boxcox_transform(Man_panicle$Panicle_exsertion_shifted, optimal_lambda_Panicleexsertion)
+
+# Apply the transformation to anther length
+Man_panicle$Panicleangle_transformed <- boxcox_transform(Man_panicle$Panicle_angle_shifted, optimal_lambda_Panicleangle)
+
+# View the transformed data
+head(Man_panicle)
+
+# dataframe to matrix for shapiro test
+# Extract and transpose relevant columns from the dataframe
+matrixpanicletrans <- t(as.matrix(Man_panicle[, c(2, 7, 8)]))
+
+# Perform the Shapiro-Wilk test for multivariate normality
+mshapiro_panicletran <- mshapiro.test(matrixpanicletrans)
+
+# Display the results
+print(mshapiro_panicletran)
+
+# MANOVA test
+panicle.man <- manova(cbind(Panicleexsertion_transformed, Panicleangle_transformed) ~ Accession, data=Man_panicle)
+summary(panicle.man)
+summary.aov(panicle.man)
+
+panicle2.man <- manova(cbind(Panicle_exsertion, Panicle_angle) ~ Accession, data=Man_panicle)
+summary(panicle2.man)
+summary.aov(panicle2.man)
+
+panicle3.man<- manova(cbind(Panicleexsertion_transformed, Panicleangle_transformed) ~ Species, data=Man_panicle)
+summary(panicle3.man)
+summary.aov(panicle3.man)
+
+
+
+Man_papstigma<-read.csv("C:/Users/afgut/vm_files/RiceData/Man_papstigma.csv")
+# dataframe to matrix for shapiro test
+matrixpapstigma<-t(Man_papstigma[,2:4])
+mshapiro.test(matrixpapstigma)
+# data normal, no box-cox transformation
+
+# MANOVA test
+papstigma.man <- manova(cbind(Papillae_density, StigmaLen) ~ Accession, data=Man_papstigma)
+summary(papstigma.man)
+summary.aov(papstigma.man)
+
+papstigma2.man <- manova(cbind(Papillae_density, StigmaLen) ~ Species, data=Man_papstigma)
+summary(papstigma2.man)
+summary.aov(papstigma2.man)
